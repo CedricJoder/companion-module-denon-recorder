@@ -24,6 +24,7 @@ class DNRInstance extends InstanceBase {
 		this.init_actions() // export actions
 		this.init_presets()
 		this.init_feedbacks()
+		this.init_variables();
 		this.init_tcp()
 	}
 
@@ -64,6 +65,28 @@ class DNRInstance extends InstanceBase {
 	pulse() {
 		this.socket.send('@0?PW\r')
 	}
+
+	init_variables() {
+		let variables = [
+			{ name : "Transport State", variableId: 'transState'},
+
+		]
+		this.setVariableDefinitions(variables);
+	}
+
+	check_variables() {
+		let self = this;
+
+		try {
+			let variable_obj ={};
+			variable_obj['transState'] = self.transState;
+			this.setVariableValues(variableObj);
+		}
+		catch(error) {
+			this.log('debug', 'Error Updating Variables: ' + error);
+		}
+	}
+			
 
 	init_tcp() {
 		let self = this
@@ -178,6 +201,7 @@ class DNRInstance extends InstanceBase {
 				if (!isPower && '' != resp) {
 					self.transState = resp
 					self.checkFeedbacks('transport')
+					self.check_variables();
 				}
 				// no ack means status update from unit, respond with ACK
 				if (!ack) {
