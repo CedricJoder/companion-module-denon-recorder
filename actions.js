@@ -149,5 +149,19 @@ export function compileActionDefinitions(self) {
 				await sendCommand(action, '23FOMAT')
 			},
 		},
+		custom: {
+			name: 'Send Custom Command',
+			options: [
+				{
+					type: 'text',
+					id: 'command',
+					label: 'Command to send',
+					default: ''
+				},
+			],
+			callback: async (action, context) => {
+				await sendCommand(action, action.options.command)
+            }
+        }
 	}
 }

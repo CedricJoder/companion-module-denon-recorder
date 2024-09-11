@@ -235,3 +235,23 @@ export const PANEL_LOCK = [
 		label: 'Transport Lock',
 	},
 ]
+
+
+export function findLabel(id, obj) {
+	for (let key in obj) {
+		if (obj[key]?.id == id) {
+			return obj[key].label
+		}
+    }
+}
+
+
+export const TRACK_CHANGE =	{
+		id: 'Tr',
+		regex: RegExp('^Tr\\d{4}$')
+	}
+
+export const TOTAL_TRACKS = {
+		id: 'Tt',
+		regex: RegExp('^Tt\\d{4}$')
+	}

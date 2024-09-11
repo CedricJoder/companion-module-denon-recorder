@@ -17,6 +17,29 @@ class DNRInstance extends InstanceBase {
 		this.transState = this.TRANS_OFF
 	}
 
+	sendCommand = async (cmd, req = false) => {
+		let self = this
+		if (self.devMode) {
+			self.log('debug', `sending '@0${cmd}' to ${self.config.host}`)
+		}
+
+		if (self.socket !== undefined && self.socket.isConnected) {
+			self.socket.send('@0' + cmd + '\r')
+			// request info if command not issue a response
+			if (req) {
+				self.pulse()
+			}
+		} else {
+			self.log('error', 'Socket not connected :(')
+		}
+	}
+
+	sendRequest = async (cmdString) => {
+		this.sendCommand('?' + cmdString)
+    }
+
+
+
 	async init(config) {
 		this.hasError = false
 		this.config = config
@@ -24,7 +47,8 @@ class DNRInstance extends InstanceBase {
 		this.init_actions() // export actions
 		this.init_presets()
 		this.init_feedbacks()
-		this.init_variables();
+		this.init_variables()
+		this.check_variables()
 		this.init_tcp()
 	}
 
@@ -68,18 +92,22 @@ class DNRInstance extends InstanceBase {
 
 	init_variables() {
 		let variables = [
-			{ name : "Transport State", variableId: 'transState'},
-
+			{ name : "Transport State", variableId: 'transportState'},
+			{ name: "Power Status", variableId: 'powerStatus' },
+			{ name: "Current Track Index", variableId: 'trackId' },
+			{ name: "Total Track Number", variableId: 'totalTracks'}
 		]
 		this.setVariableDefinitions(variables);
 	}
 
 	check_variables() {
 		let self = this;
-
 		try {
-			let variable_obj ={};
-			variable_obj['transState'] = self.transState;
+			let variableObj ={};
+			variableObj['transportState'] = CHOICES.findLabel(self.transState, CHOICES.TRANSPORT)
+			variableObj['powerStatus'] = self.powerOn ? 'Power On' : 'Power Standby'
+			variableObj['trackId'] = self.trackId
+			variableObj['totalTracks'] = self.totalTracks
 			this.setVariableValues(variableObj);
 		}
 		catch(error) {
@@ -143,9 +171,14 @@ class DNRInstance extends InstanceBase {
 					console.log('Sending @0?PW')
 				}
 				self.socket.send('@0?PW\r')
+				self.sendRequest(CHOICES.TRACK_CHANGE.id)
+				self.sendRequest(CHOICES.TOTAL_TRACKS.id)
 			})
 
 			this.socket.on('data', function (chunk) {
+				if (self.devModr) {
+					console.log('Received message from device : ' + chunk)
+				}
 				let ack = 0
 				while (ack < chunk.byteLength && chunk.readInt8(ack) == 6) {
 					ack++
@@ -196,12 +229,23 @@ class DNRInstance extends InstanceBase {
 					case 'STST':
 						break
 					default: // something we don't track
-						resp = ''
+						if (CHOICES.TRACK_CHANGE.regex.test(resp)) {
+							self.trackId = Number(resp.slice(2))
+							self.check_variables()
+							resp = ''
+						} else if (CHOICES.TOTAL_TRACKS.regex.test(resp)) {
+							self.totalTracks = Number(resp.slice(2))
+							self.check_variables()
+							resp = ''
+						} else {
+							resp = ''
+                        }
+						
 				}
 				if (!isPower && '' != resp) {
 					self.transState = resp
 					self.checkFeedbacks('transport')
-					self.check_variables();
+					self.check_variables()
 				}
 				// no ack means status update from unit, respond with ACK
 				if (!ack) {
